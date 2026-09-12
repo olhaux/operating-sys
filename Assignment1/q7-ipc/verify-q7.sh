@@ -12,6 +12,9 @@
 set -u
 cd "$(dirname "$0")"
 
+# modinfo lives in /usr/sbin on Debian, which is not on a regular user's PATH.
+PATH="$PATH:/usr/sbin:/sbin"
+
 hr() { printf '\n=== %s ===\n' "$1"; }
 KREL=$(uname -r)
 
