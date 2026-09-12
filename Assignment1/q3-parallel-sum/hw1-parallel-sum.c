@@ -6,34 +6,20 @@
 
 #define ARRAY_LEN 1000301
 
-static float *array = NULL;
-static int num_threads = 0;
+int num_threads = 0;
+float *array = NULL;
+double *partial = NULL;   // one partial sum per thread, indexed by id
 
-typedef struct {
-    int    id;
-    long   start;
-    long   end;
-    double partial;
-} targ_t;
+int next_id = 0;
+pthread_mutex_t id_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static double now_sec(void)
+void *thread_func(void *arg); /* the thread function */
+
+double now_sec(void)
 {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec + ts.tv_nsec / 1e9;
-}
-
-void *thread_func(void *arg)
-{
-    targ_t *t = (targ_t *)arg;
-    double my_sum = 0.0;
-
-    for (long i = t->start; i < t->end; i++)
-        my_sum += array[i];
-
-    t->partial = my_sum;
-    printf("Thread %d sum = %f\n", t->id, my_sum);
-    pthread_exit(0);
 }
 
 int main(int argc, char *argv[])
@@ -48,63 +34,75 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Initialize an array of random values 
-    array = malloc((size_t)ARRAY_LEN * sizeof(float));
-    if (!array) { perror("malloc array"); return 1; }
-
+    /* Initialize an array of random values */
+    array = malloc(ARRAY_LEN * sizeof(float));
+    if (!array) { perror("malloc"); return 1; }
     srand(12345); // fixed seed
     for (long i = 0; i < ARRAY_LEN; i++)
         array[i] = (float)rand() / (float)RAND_MAX;
 
-    // Perform Serial Sum 
+    /* Perform Serial Sum */
     double t0 = now_sec();
     double sum_serial = 0.0;
     for (long i = 0; i < ARRAY_LEN; i++)
         sum_serial += array[i];
     double time_serial = now_sec() - t0;
-
     printf("Serial Sum = %f, time = %.3f ms\n", sum_serial, time_serial * 1000.0);
 
-    // Parallel sum 
-    pthread_t *workers = malloc((size_t)num_threads * sizeof(pthread_t));
-    targ_t    *targs   = malloc((size_t)num_threads * sizeof(targ_t));
-    if (!workers || !targs) { perror("malloc workers"); free(array); return 1; }
-
-    // the first rem threads take one extra element
-    long base = ARRAY_LEN / num_threads;
-    long rem  = ARRAY_LEN % num_threads;
-    long pos  = 0;
+    /* Create a pool of num_threads workers and keep them in workers */
+    pthread_t *workers = malloc(num_threads * sizeof(pthread_t));
+    partial = malloc(num_threads * sizeof(double));
+    if (!workers || !partial) { perror("malloc"); return 1; }
 
     t0 = now_sec(); // includes thread creation
-
     for (int i = 0; i < num_threads; i++) {
-        long len = base + (i < rem ? 1 : 0);
-        targs[i].id      = i;
-        targs[i].start   = pos;
-        targs[i].end     = pos + len;
-        targs[i].partial = 0.0;
-        pos += len;
-
         pthread_attr_t attr;
         pthread_attr_init(&attr);
-        if (pthread_create(&workers[i], &attr, thread_func, &targs[i]) != 0) {
+        if (pthread_create(&workers[i], &attr, thread_func, NULL) != 0) {
             perror("pthread_create");
             return 1;
         }
         pthread_attr_destroy(&attr);
     }
 
-    double sum_parallel = 0.0;
-    for (int i = 0; i < num_threads; i++) {
+    for (int i = 0; i < num_threads; i++)
         pthread_join(workers[i], NULL);
-        sum_parallel += targs[i].partial;
-    }
-    double time_parallel = now_sec() - t0;
 
+    double sum_parallel = 0.0;
+    for (int i = 0; i < num_threads; i++)
+        sum_parallel += partial[i];
+    double time_parallel = now_sec() - t0;
     printf("Parallel Sum = %f, time = %.3f ms\n", sum_parallel, time_parallel * 1000.0);
 
+    /* free up resources properly */
     free(array);
+    free(partial);
     free(workers);
-    free(targs);
     return 0;
+}
+
+void *thread_func(void *arg)
+{
+    (void)arg; // not used, the id comes from next_id
+
+    /* Assign each thread an id so that they are unique in range [0, num_thread -1 ] */
+    pthread_mutex_lock(&id_lock);
+    int my_id = next_id;
+    next_id++;
+    pthread_mutex_unlock(&id_lock);
+
+    // the first rem threads take one extra element
+    long base = ARRAY_LEN / num_threads;
+    long rem = ARRAY_LEN % num_threads;
+    long start = my_id * base + (my_id < rem ? my_id : rem);
+    long end = start + base + (my_id < rem ? 1 : 0);
+
+    /* Perform Partial Parallel Sum Here */
+    double my_sum = 0.0;
+    for (long i = start; i < end; i++)
+        my_sum += array[i];
+
+    partial[my_id] = my_sum;
+    printf("Thread %d sum = %f\n", my_id, my_sum);
+    pthread_exit(0);
 }
