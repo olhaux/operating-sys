@@ -29,8 +29,11 @@ module-clean:
 	-@$(MAKE) -C csprobe clean 2>/dev/null || true
 
 # End-to-end Q7.4 + Q7.5 sequence. Needs sudo; run it interactively.
+# Scripts are invoked through bash rather than ./script.sh: git on Windows
+# (core.filemode=false) and most zip tools drop the executable bit, which
+# would otherwise fail with 'Permission denied'.
 verify: $(TARGET)
-	./verify-q7.sh
+	bash ./verify-q7.sh
 
 # Q7.2 -- small ITERS, or strace makes this take hours.
 strace:
@@ -39,11 +42,11 @@ strace:
 
 # Q7.6 -- context-switch counts across several ITERS values.
 ctxsw:
-	./measure-cs.sh 250000 500000 1000000
+	bash ./measure-cs.sh 250000 500000 1000000
 
 # NOTE: 'clean' must work on a machine with no kernel headers, so it does NOT
 # depend on module-clean. Use 'make module-clean' for the .ko build products.
 clean:
-	rm -f $(TARGET) $(TARGET)-strace ipc-test ipc-strace ipc-cs
+	rm -f $(TARGET) $(TARGET)-strace ipc-test ipc-strace ipc-cs \n	      Module.symvers modules.order .Module.symvers.cmd .modules.order.cmd
 
 .PHONY: all run module module-clean verify strace ctxsw clean

@@ -7,11 +7,16 @@ obj-m += csprobe.o
 
 KDIR ?= /lib/modules/$(shell uname -r)/build
 
+# M= must be $(CURDIR), not $(PWD). PWD comes from the calling shell and is
+# NOT updated by 'make -C csprobe', so when this Makefile is reached through
+# 'make module' from q7-ipc/, $(PWD) still names the parent directory and
+# kbuild silently builds nothing. CURDIR is set by make itself.
+
 all:
-	$(MAKE) -C $(KDIR) M=$(PWD) modules
+	$(MAKE) -C $(KDIR) M=$(CURDIR) modules
 
 clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) clean
+	$(MAKE) -C $(KDIR) M=$(CURDIR) clean
 
 run: all
 	sudo insmod csprobe.ko
