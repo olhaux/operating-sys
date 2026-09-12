@@ -1,23 +1,10 @@
-/*
- * hw1-histogram.c  --  Q4: multi-threaded histogram of an array
- *
- * Usage: ./hw1-histogram <num_threads> <array_length> <num_bins>
- *
- * The master builds an array of random floats in [0,1] and histograms it
- * serially. Then num_threads workers each histogram a disjoint slice into a
- * PRIVATE bin array; the master reduces those into the final histogram.
- *
- * The private-then-reduce pattern is the whole point: a single shared
- * histogram would make hist[b]++ a data race, because ++ is a
- * read-modify-write, not an atomic operation.
- */
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-static float *array = NULL;   /* READ-ONLY once filled by the master */
+static float *array = NULL;
 static long   array_len = 0;
 static int    num_bins  = 0;
 static int    num_threads = 0;
@@ -26,7 +13,7 @@ typedef struct {
     int   id;
     long  start;
     long  end;
-    long *hist;   /* private bin array, calloc'd per thread */
+    long *hist; // this thread's own bins
 } targ_t;
 
 static double now_sec(void)
@@ -36,8 +23,7 @@ static double now_sec(void)
     return ts.tv_sec + ts.tv_nsec / 1e9;
 }
 
-/* Map a value in [0,1] to a bin index. A value of exactly 1.0 would compute
- * index == num_bins and write one past the end, so it is clamped. */
+// v == 1.0 would land one past the last bin, so clamp it
 static inline int bin_of(float v)
 {
     int b = (int)(v * (float)num_bins);
@@ -59,7 +45,7 @@ void *thread_func(void *arg)
     targ_t *t = (targ_t *)arg;
 
     for (long i = t->start; i < t->end; i++)
-        t->hist[bin_of(array[i])]++;   /* private bins -> no lock needed */
+        t->hist[bin_of(array[i])]++; // own bins, no lock needed
 
     pthread_exit(0);
 }
@@ -88,7 +74,7 @@ int main(int argc, char *argv[])
     for (long i = 0; i < array_len; i++)
         array[i] = (float)rand() / (float)RAND_MAX;
 
-    /* ---- serial histogram ---- */
+    /* serial histogram */
     long *hist_serial = calloc((size_t)num_bins, sizeof(long));
     if (!hist_serial) { perror("calloc"); return 1; }
 
@@ -100,7 +86,7 @@ int main(int argc, char *argv[])
     print_hist("Serial histogram:", hist_serial);
     printf("Serial   time = %.3f ms\n\n", time_serial * 1000.0);
 
-    /* ---- parallel histogram ---- */
+    /* parallel histogram */
     pthread_t *workers = malloc((size_t)num_threads * sizeof(pthread_t));
     targ_t    *targs   = malloc((size_t)num_threads * sizeof(targ_t));
     long      *hist_parallel = calloc((size_t)num_bins, sizeof(long));
@@ -129,7 +115,7 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < num_threads; i++) {
         pthread_join(workers[i], NULL);
-        for (int b = 0; b < num_bins; b++)      /* master reduces */
+        for (int b = 0; b < num_bins; b++)
             hist_parallel[b] += targs[i].hist[b];
     }
     double time_parallel = now_sec() - t0;

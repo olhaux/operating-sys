@@ -1,14 +1,3 @@
-/*
- * hw1-scheduling.c  --  Q6: non-preemptive priority scheduling simulation
- *
- * NOTE ON THE SKELETON: the original pick_next() had an extra closing brace,
- * which put "return best;" outside the function body -- the file did not
- * compile. That is fixed here.
- *
- * All 8 threads "arrive" at time 0. A global lock + condition variable let
- * exactly one thread be "on CPU" at a time. sim_clock is the simulated clock,
- * advanced by the burst of whichever thread just ran.
- */
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,7 +11,7 @@ typedef struct {
     int priority;      // lower is more important
     int burst_time;    // CPU burst time
     int remaining;     // remaining time
-    int start_time;    // when it first got the CPU
+    int start_time;
     int completion_time;
     int waiting_time;
     int turnaround_time;
@@ -36,8 +25,7 @@ pthread_cond_t  sched_cond = PTHREAD_COND_INITIALIZER;
 int current_running_tid = -1;   // the id of thread allowed to run
 int sim_clock = 0;              // simulated time
 
-/* TODO 1 (completed): choose the runnable thread with the highest priority
- * (numerically lowest .priority); break ties by lowest id. */
+// highest priority first (lowest number), ties go to the lowest id
 int pick_next() {
     int best = -1;
     for (int i = 0; i < NUM_THREADS; i++) {
@@ -73,15 +61,13 @@ void *thread_func(void *arg) {
             break;
         }
 
-        /* This thread now holds the CPU. Because it runs its ENTIRE remaining
-         * burst before schedule() is called again, this is NON-PREEMPTIVE. */
         t->start_time = sim_clock;
         printf("t=%2d: Thread %d (prio %d) runs for %d units\n",
                sim_clock, t->id, t->priority, t->remaining);
 
         sim_clock += t->remaining;
         t->completion_time = sim_clock;
-        t->turnaround_time = t->completion_time;              /* arrival = 0 */
+        t->turnaround_time = t->completion_time; // everyone arrives at 0
         t->waiting_time    = t->turnaround_time - t->burst_time;
         t->remaining = 0;
 
@@ -111,7 +97,7 @@ int main() {
     for (int i = 0; i < NUM_THREADS; i++)
         pthread_join(tids[i], NULL);
 
-    /* TODO 2 (completed): print each thread's waiting and turnaround time. */
+    // waiting and turnaround time per thread
     printf("\n%-8s %-6s %-7s %-8s %-10s %-10s\n",
            "Thread", "Prio", "Burst", "Start", "Waiting", "Turnaround");
     double total_wait = 0.0, total_tat = 0.0;
@@ -124,7 +110,7 @@ int main() {
         total_tat  += threads[i].turnaround_time;
     }
 
-    /* TODO 3 (completed): print the averages. */
+    // averages
     printf("\nAverage waiting time    = %.3f\n", total_wait / NUM_THREADS);
     printf("Average turnaround time = %.3f\n",  total_tat  / NUM_THREADS);
     printf("Thread 6 turnaround     = %d\n", threads[6].turnaround_time);

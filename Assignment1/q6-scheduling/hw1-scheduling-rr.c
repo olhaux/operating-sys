@@ -1,20 +1,4 @@
-/*
- * hw1-scheduling-rr.c  --  Q6.3: reduce thread 6's turnaround time to < 20
- *
- * WHY NOT PLAIN AGING?
- * If every waiting thread's priority improves at the SAME rate, the relative
- * order of the ready queue never changes, so thread 6 still runs last. Uniform
- * aging cannot fix this. Aging only works if it is non-uniform (e.g. applied
- * only past a starvation threshold).
- *
- * The clean fix is a TIME QUANTUM with round-robin dispatch: every runnable
- * thread gets the CPU once per sweep, so thread 6 (burst 1) finishes in the
- * very first sweep.
- *
- * NOTE: a quantum alone is NOT enough if the picker still sorts by priority --
- * thread 7 (prio 1) would simply win every quantum until it finished. The
- * dispatch order itself has to rotate.
- */
+// round robin version for 6.3
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,7 +20,7 @@ int current_running_tid = -1;
 int sim_clock = 0;
 int last_run  = -1;
 
-/* Round-robin: start scanning just past whoever ran last, wrapping around. */
+// start after whoever ran last
 int pick_next() {
     for (int k = 1; k <= NUM_THREADS; k++) {
         int i = (last_run + k) % NUM_THREADS;
@@ -71,7 +55,7 @@ void *thread_func(void *arg) {
         if (t->start_time < 0)
             t->start_time = sim_clock;
 
-        /* Run at most one quantum, then yield -- this is PREEMPTIVE. */
+        // run at most one quantum
         int slice = (t->remaining < QUANTUM) ? t->remaining : QUANTUM;
         printf("t=%2d: Thread %d (prio %d) runs %d unit(s)  [remaining %d -> %d]\n",
                sim_clock, t->id, t->priority, slice,

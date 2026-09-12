@@ -1,16 +1,6 @@
 /*
- * hw1-ipc.c  --  Q7: pipe ping-pong between parent and child
- *
- * Two processes bounce a single byte back and forth through two pipes,
- * ITERS times. Both are pinned to the same CPU so every exchange forces a
- * context switch.
- *
- * ITERS is overridable at compile time:
- *     gcc -DITERS=100000 ...
- * Use a SMALL value under strace (strace adds tens of microseconds per
- * syscall; 10,000,000 iterations = 20,000,000 syscalls = hours).
- * Use the LARGE default when sampling /proc/csprobe, so the run lasts long
- * enough to read the file three times.
+ * In this C program, two processes communicate a single byte back and forth through pipes.
+ * In a separate file, you will modify a custom kernel module to measure context switches in kernel space.
  */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -22,6 +12,7 @@
 #include <errno.h>
 #include <sys/wait.h>
 
+// override with -DITERS=n
 #ifndef ITERS
 #define ITERS 10000000
 #endif
@@ -46,8 +37,7 @@ int main(int argc, char **argv) {
         cpu = atoi(argv[1]);
 
     int p2c[2], c2p[2];
-    /* p2c: parent writes p2c[1] -> child reads p2c[0]
-     * c2p: child  writes c2p[1] -> parent reads c2p[0] */
+    /* create two pipes parent->child p2c, child->parent c2p */
     if (pipe(p2c) < 0) { perror("pipe p2c"); exit(1); }
     if (pipe(c2p) < 0) { perror("pipe c2p"); exit(1); }
 
@@ -62,21 +52,17 @@ int main(int argc, char **argv) {
     if (pid == 0) {
         pin_to_cpu(cpu);
 
-        /* The child READS from p2c and WRITES to c2p, so it never uses
-         * p2c's write end or c2p's read end. Closing them matters:
-         * a pipe only reports EOF when *every* copy of its write end is
-         * closed, so a leaked descriptor here would stop the peer from ever
-         * seeing the pipe close. It also stops the fd table leaking. */
+        /* Close the ends this process never uses */
         close(p2c[1]);
         close(c2p[0]);
 
         for (int i = 0; i < ITERS; i++) {
-            /* read from the parent->child pipe (blocks until parent writes) */
+            /* read from a pipe */
             if (read(p2c[0], &byte, 1) != 1) {
                 perror("child read");
                 _exit(1);
             }
-            /* write back on the child->parent pipe */
+            /* write to a pipe */
             if (write(c2p[1], &byte, 1) != 1) {
                 perror("child write");
                 _exit(1);
@@ -89,8 +75,7 @@ int main(int argc, char **argv) {
     else{
         pin_to_cpu(cpu);
 
-        /* The parent WRITES to p2c and READS from c2p, so it never uses
-         * p2c's read end or c2p's write end. */
+        /* Close the ends this process never uses */
         close(p2c[0]);
         close(c2p[1]);
 

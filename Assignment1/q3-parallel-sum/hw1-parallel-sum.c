@@ -1,32 +1,19 @@
-/*
- * hw1-parallel-sum.c  --  Q3: multi-threaded sum of an array
- *
- * Master thread builds an array of ARRAY_LEN random floats in [0,1], sums it
- * serially, then splits the array across num_threads workers that each sum a
- * disjoint slice. The master aggregates the partial sums. Both phases timed.
- *
- * Build: gcc -O2 -Wall -pthread -o hw1-parallel-sum hw1-parallel-sum.c
- * Usage: ./hw1-parallel-sum <num_threads>
- */
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
 
-#define ARRAY_LEN 1000301   /* deliberately not divisible by 2 or 4 */
+#define ARRAY_LEN 1000301
 
-static float *array = NULL;   /* READ-ONLY once the master has filled it */
-static int num_threads = 0;   /* READ-ONLY once parsed from argv          */
+static float *array = NULL;
+static int num_threads = 0;
 
-/* Per-thread argument block. Each worker touches only its own struct, so no
- * lock is needed: the threads share the struct *array* but never the same
- * element. */
 typedef struct {
-    int    id;        /* unique id in [0, num_threads-1] */
-    long   start;     /* first index of this thread's slice (inclusive) */
-    long   end;       /* last index of this thread's slice  (exclusive) */
-    double partial;   /* written by this thread, read by master after join */
+    int    id;
+    long   start;
+    long   end;
+    double partial;
 } targ_t;
 
 static double now_sec(void)
@@ -62,15 +49,15 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    /* ---- master builds the array ---- */
+    /* Initialize an array of random values */
     array = malloc((size_t)ARRAY_LEN * sizeof(float));
     if (!array) { perror("malloc array"); return 1; }
 
-    srand(12345);   /* fixed seed so runs are comparable to each other */
+    srand(12345); // fixed seed
     for (long i = 0; i < ARRAY_LEN; i++)
         array[i] = (float)rand() / (float)RAND_MAX;
 
-    /* ---- serial sum ---- */
+    /* Perform Serial Sum */
     double t0 = now_sec();
     double sum_serial = 0.0;
     for (long i = 0; i < ARRAY_LEN; i++)
@@ -79,19 +66,17 @@ int main(int argc, char *argv[])
 
     printf("Serial   Sum = %f, time = %.3f ms\n", sum_serial, time_serial * 1000.0);
 
-    /* ---- parallel sum ---- */
+    /* Parallel sum */
     pthread_t *workers = malloc((size_t)num_threads * sizeof(pthread_t));
     targ_t    *targs   = malloc((size_t)num_threads * sizeof(targ_t));
     if (!workers || !targs) { perror("malloc workers"); free(array); return 1; }
 
-    /* Split ARRAY_LEN into num_threads slices. ARRAY_LEN may not divide
-     * evenly, so the first (ARRAY_LEN % num_threads) threads take one extra
-     * element. This guarantees the slices tile the array exactly. */
+    // the first rem threads take one extra element
     long base = ARRAY_LEN / num_threads;
     long rem  = ARRAY_LEN % num_threads;
     long pos  = 0;
 
-    t0 = now_sec();   /* timer includes thread creation -- that is the honest cost */
+    t0 = now_sec(); // includes thread creation
 
     for (int i = 0; i < num_threads; i++) {
         long len = base + (i < rem ? 1 : 0);
@@ -113,7 +98,7 @@ int main(int argc, char *argv[])
     double sum_parallel = 0.0;
     for (int i = 0; i < num_threads; i++) {
         pthread_join(workers[i], NULL);
-        sum_parallel += targs[i].partial;   /* master aggregates */
+        sum_parallel += targs[i].partial;
     }
     double time_parallel = now_sec() - t0;
 
