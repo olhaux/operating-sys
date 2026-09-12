@@ -1,7 +1,6 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <time.h>
 
 static float *array = NULL;
@@ -36,8 +35,7 @@ static void print_hist(const char *label, const long *h)
 {
     printf("%s\n", label);
     for (int b = 0; b < num_bins; b++)
-        printf("  bin %2d [%.4f, %.4f) : %ld\n",
-               b, (double)b / num_bins, (double)(b + 1) / num_bins, h[b]);
+        printf("bin %d: %ld\n", b, h[b]);
 }
 
 void *thread_func(void *arg)
@@ -65,9 +63,6 @@ int main(int argc, char *argv[])
     }
     if (num_threads > array_len) num_threads = (int)array_len;
 
-    printf("threads = %d, array_length = %ld, bins = %d\n\n",
-           num_threads, array_len, num_bins);
-
     array = malloc((size_t)array_len * sizeof(float));
     if (!array) { perror("malloc array"); return 1; }
     srand(12345);
@@ -84,7 +79,7 @@ int main(int argc, char *argv[])
     double time_serial = now_sec() - t0;
 
     print_hist("Serial histogram:", hist_serial);
-    printf("Serial   time = %.3f ms\n\n", time_serial * 1000.0);
+    printf("Serial time = %.3f ms\n\n", time_serial * 1000.0);
 
     /* parallel histogram */
     pthread_t *workers = malloc((size_t)num_threads * sizeof(pthread_t));
@@ -122,11 +117,6 @@ int main(int argc, char *argv[])
 
     print_hist("Parallel histogram:", hist_parallel);
     printf("Parallel time = %.3f ms\n", time_parallel * 1000.0);
-    printf("speedup = %.2fx\n", time_serial / time_parallel);
-
-    int identical = (memcmp(hist_serial, hist_parallel,
-                            (size_t)num_bins * sizeof(long)) == 0);
-    printf("histograms identical: %s\n", identical ? "YES" : "NO");
 
     for (int i = 0; i < num_threads; i++) free(targs[i].hist);
     free(array); free(hist_serial); free(hist_parallel);

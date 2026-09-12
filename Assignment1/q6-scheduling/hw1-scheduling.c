@@ -11,7 +11,6 @@ typedef struct {
     int priority;      // lower is more important
     int burst_time;    // CPU burst time
     int remaining;     // remaining time
-    int start_time;
     int completion_time;
     int waiting_time;
     int turnaround_time;
@@ -61,9 +60,8 @@ void *thread_func(void *arg) {
             break;
         }
 
-        t->start_time = sim_clock;
-        printf("t=%2d: Thread %d (prio %d) runs for %d units\n",
-               sim_clock, t->id, t->priority, t->remaining);
+        printf("Thread %d (prio %d) runs for %d units\n",
+               t->id, t->priority, t->remaining);
 
         sim_clock += t->remaining;
         t->completion_time = sim_clock;
@@ -87,7 +85,6 @@ int main() {
         threads[i].id = i;
         threads[i].priority = prios[i];
         threads[i].burst_time = threads[i].remaining = bursts[i];
-        threads[i].start_time = -1;
         pthread_create(&tids[i], NULL, thread_func, &threads[i]);
     }
 
@@ -98,22 +95,18 @@ int main() {
         pthread_join(tids[i], NULL);
 
     // waiting and turnaround time per thread
-    printf("\n%-8s %-6s %-7s %-8s %-10s %-10s\n",
-           "Thread", "Prio", "Burst", "Start", "Waiting", "Turnaround");
+    printf("\n");
     double total_wait = 0.0, total_tat = 0.0;
     for (int i = 0; i < NUM_THREADS; i++) {
-        printf("%-8d %-6d %-7d %-8d %-10d %-10d\n",
-               threads[i].id, threads[i].priority, threads[i].burst_time,
-               threads[i].start_time, threads[i].waiting_time,
-               threads[i].turnaround_time);
+        printf("Thread %d: waiting = %d, turnaround = %d\n",
+               threads[i].id, threads[i].waiting_time, threads[i].turnaround_time);
         total_wait += threads[i].waiting_time;
         total_tat  += threads[i].turnaround_time;
     }
 
     // averages
-    printf("\nAverage waiting time    = %.3f\n", total_wait / NUM_THREADS);
-    printf("Average turnaround time = %.3f\n",  total_tat  / NUM_THREADS);
-    printf("Thread 6 turnaround     = %d\n", threads[6].turnaround_time);
+    printf("\nAverage waiting time = %.3f\n", total_wait / NUM_THREADS);
+    printf("Average turnaround time = %.3f\n", total_tat / NUM_THREADS);
 
     return 0;
 }

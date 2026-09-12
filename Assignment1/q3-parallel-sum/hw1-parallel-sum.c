@@ -32,8 +32,7 @@ void *thread_func(void *arg)
         my_sum += array[i];
 
     t->partial = my_sum;
-    printf("Thread %d sum = %f   (elements [%ld, %ld), %ld items)\n",
-           t->id, my_sum, t->start, t->end, t->end - t->start);
+    printf("Thread %d sum = %f\n", t->id, my_sum);
     pthread_exit(0);
 }
 
@@ -64,7 +63,7 @@ int main(int argc, char *argv[])
         sum_serial += array[i];
     double time_serial = now_sec() - t0;
 
-    printf("Serial   Sum = %f, time = %.3f ms\n", sum_serial, time_serial * 1000.0);
+    printf("Serial Sum = %f, time = %.3f ms\n", sum_serial, time_serial * 1000.0);
 
     // Parallel sum 
     pthread_t *workers = malloc((size_t)num_threads * sizeof(pthread_t));
@@ -103,8 +102,6 @@ int main(int argc, char *argv[])
     double time_parallel = now_sec() - t0;
 
     printf("Parallel Sum = %f, time = %.3f ms\n", sum_parallel, time_parallel * 1000.0);
-    printf("difference (serial - parallel) = %.9f\n", sum_serial - sum_parallel);
-    printf("speedup = %.2fx\n", time_serial / time_parallel);
 
     free(array);
     free(workers);

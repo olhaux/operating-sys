@@ -8,9 +8,9 @@ $(TARGET): hw1-parallel-sum.c
 	$(CC) $(CFLAGS) -o $@ $<
 
 run: $(TARGET)
-	@echo "===== 1 thread ====="  && ./$(TARGET) 1
-	@echo "===== 2 threads =====" && ./$(TARGET) 2
-	@echo "===== 4 threads =====" && ./$(TARGET) 4
+	./$(TARGET) 1
+	./$(TARGET) 2
+	./$(TARGET) 4
 
 clean:
 	rm -f $(TARGET)

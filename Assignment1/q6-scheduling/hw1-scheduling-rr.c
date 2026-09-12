@@ -9,7 +9,7 @@
 
 typedef struct {
     int id, priority, burst_time, remaining;
-    int start_time, completion_time, waiting_time, turnaround_time;
+    int completion_time, waiting_time, turnaround_time;
 } thread_info_t;
 
 thread_info_t threads[NUM_THREADS];
@@ -52,14 +52,10 @@ void *thread_func(void *arg) {
             break;
         }
 
-        if (t->start_time < 0)
-            t->start_time = sim_clock;
-
         // run at most one quantum
         int slice = (t->remaining < QUANTUM) ? t->remaining : QUANTUM;
-        printf("t=%2d: Thread %d (prio %d) runs %d unit(s)  [remaining %d -> %d]\n",
-               sim_clock, t->id, t->priority, slice,
-               t->remaining, t->remaining - slice);
+        printf("Thread %d (prio %d) runs for %d units\n",
+               t->id, t->priority, slice);
 
         sim_clock   += slice;
         t->remaining -= slice;
@@ -68,8 +64,6 @@ void *thread_func(void *arg) {
             t->completion_time = sim_clock;
             t->turnaround_time = t->completion_time;
             t->waiting_time    = t->turnaround_time - t->burst_time;
-            printf("      -> Thread %d COMPLETED at t=%d (turnaround %d)\n",
-                   t->id, sim_clock, t->turnaround_time);
         }
 
         pthread_mutex_unlock(&sched_lock);
@@ -87,7 +81,6 @@ int main() {
         threads[i].id = i;
         threads[i].priority = prios[i];
         threads[i].burst_time = threads[i].remaining = bursts[i];
-        threads[i].start_time = -1;
         pthread_create(&tids[i], NULL, thread_func, &threads[i]);
     }
 
@@ -97,22 +90,16 @@ int main() {
     for (int i = 0; i < NUM_THREADS; i++)
         pthread_join(tids[i], NULL);
 
-    printf("\n%-8s %-6s %-7s %-8s %-10s %-10s\n",
-           "Thread", "Prio", "Burst", "Start", "Waiting", "Turnaround");
+    printf("\n");
     double total_wait = 0.0, total_tat = 0.0;
     for (int i = 0; i < NUM_THREADS; i++) {
-        printf("%-8d %-6d %-7d %-8d %-10d %-10d\n",
-               threads[i].id, threads[i].priority, threads[i].burst_time,
-               threads[i].start_time, threads[i].waiting_time,
-               threads[i].turnaround_time);
+        printf("Thread %d: waiting = %d, turnaround = %d\n",
+               threads[i].id, threads[i].waiting_time, threads[i].turnaround_time);
         total_wait += threads[i].waiting_time;
         total_tat  += threads[i].turnaround_time;
     }
-    printf("\nQUANTUM = %d\n", QUANTUM);
-    printf("Average waiting time    = %.3f\n", total_wait / NUM_THREADS);
-    printf("Average turnaround time = %.3f\n",  total_tat  / NUM_THREADS);
-    printf("Thread 6 turnaround     = %d  (target: < 20)\n",
-           threads[6].turnaround_time);
+    printf("\nAverage waiting time = %.3f\n", total_wait / NUM_THREADS);
+    printf("Average turnaround time = %.3f\n", total_tat / NUM_THREADS);
 
     return 0;
 }
