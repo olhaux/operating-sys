@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    /* Initialize an array of random values */
+    // Initialize an array of random values 
     array = malloc((size_t)ARRAY_LEN * sizeof(float));
     if (!array) { perror("malloc array"); return 1; }
 
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
     for (long i = 0; i < ARRAY_LEN; i++)
         array[i] = (float)rand() / (float)RAND_MAX;
 
-    /* Perform Serial Sum */
+    // Perform Serial Sum 
     double t0 = now_sec();
     double sum_serial = 0.0;
     for (long i = 0; i < ARRAY_LEN; i++)
@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
 
     printf("Serial   Sum = %f, time = %.3f ms\n", sum_serial, time_serial * 1000.0);
 
-    /* Parallel sum */
+    // Parallel sum 
     pthread_t *workers = malloc((size_t)num_threads * sizeof(pthread_t));
     targ_t    *targs   = malloc((size_t)num_threads * sizeof(targ_t));
     if (!workers || !targs) { perror("malloc workers"); free(array); return 1; }
