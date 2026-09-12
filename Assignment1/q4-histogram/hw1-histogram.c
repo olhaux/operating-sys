@@ -122,9 +122,17 @@ void *thread_func(void *arg)
     long start = my_id * base + (my_id < rem ? my_id : rem);
     long end = start + base + (my_id < rem ? 1 : 0);
 
-    long *my_hist = local_hist[my_id];
+    // count on this thread's own stack, then copy the result out once.
+    // counting straight into local_hist was slower: the threads' arrays sit
+    // next to each other in memory and ended up sharing cache lines
+    long counts[num_bins];
+    for (int b = 0; b < num_bins; b++)
+        counts[b] = 0;
     for (long i = start; i < end; i++)
-        my_hist[bin_of(array[i])]++; // own bins, no lock needed
+        counts[bin_of(array[i])]++;
+
+    for (int b = 0; b < num_bins; b++)
+        local_hist[my_id][b] = counts[b];
 
     pthread_exit(0);
 }
