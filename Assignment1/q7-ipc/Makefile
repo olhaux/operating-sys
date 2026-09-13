@@ -6,8 +6,7 @@ TARGET = hw1-ipc
 ITERS        ?= 10000000
 STRACE_ITERS ?= 20000
 
-# the kernel module is built separately: make module
-all: $(TARGET)
+all: $(TARGET) module
 
 $(TARGET): hw1-ipc.c
 	$(CC) $(CFLAGS) -DITERS=$(ITERS) -o $@ $<
@@ -22,12 +21,12 @@ module:
 module-clean:
 	-@$(MAKE) -C csprobe clean 2>/dev/null || true
 
-# fewer iterations, strace is slow
+# fewer iterations since strace is slow
 strace:
 	$(CC) $(CFLAGS) -DITERS=$(STRACE_ITERS) -o $(TARGET)-strace hw1-ipc.c
 	strace -f -e trace=read,write -c ./$(TARGET)-strace 0
 
-clean:
+clean: module-clean
 	rm -f $(TARGET) $(TARGET)-strace \
 	      Module.symvers modules.order .Module.symvers.cmd .modules.order.cmd
 

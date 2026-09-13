@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
         cpu = atoi(argv[1]);
 
     int p2c[2], c2p[2];
-    // create two pipes parent->child p2c, child->parent c2p 
+    /* create pipes p2c (parent to child) and c2p (child to parent) */
     if (pipe(p2c) < 0) {
         perror("pipe p2c");
         exit(1);
@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
     if (pid == 0) {
         pin_to_cpu(cpu);
 
-        // Close the ends this process never uses
+        /* Close the ends this process never uses */
         close(p2c[1]);
         close(c2p[0]);
 

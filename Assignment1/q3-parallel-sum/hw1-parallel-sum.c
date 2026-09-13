@@ -8,7 +8,7 @@
 
 int num_threads = 0;
 float *array = NULL;
-double *partial = NULL;   // one partial sum per thread, indexed by id
+double *partial = NULL;   // one partial sum per thread indexed by id
 
 int next_id = 0;
 pthread_mutex_t id_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
 }
 
 void *thread_func(void *arg) {
-     (void)arg; // not used, the id comes from next_id
+     (void)arg; // not used since the id comes from next_id
 
      /* Assign each thread an id so that they are unique in range [0, num_thread -1 ] */
      pthread_mutex_lock(&id_lock);

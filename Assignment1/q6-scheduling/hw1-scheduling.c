@@ -24,7 +24,7 @@ pthread_cond_t  sched_cond = PTHREAD_COND_INITIALIZER;
 int current_running_tid = -1;   // the id of thread allowed to run
 int sim_clock = 0;              // simulated time
 
-// highest priority first (lowest number), ties go to the lowest id
+// lowest priority number wins and ties go to the lowest id
 int pick_next() {
     int best = -1;
     for (int i = 0; i < NUM_THREADS; i++) {

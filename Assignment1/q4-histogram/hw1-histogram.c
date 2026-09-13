@@ -7,7 +7,7 @@ int num_threads = 0;
 long array_len = 0;
 int num_bins = 0;
 float *array = NULL;
-long **local_hist = NULL;   // one histogram per thread, indexed by id
+long **local_hist = NULL;   // one histogram per thread indexed by id
 
 int next_id = 0;
 pthread_mutex_t id_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -21,7 +21,7 @@ double now_sec(void)
     return ts.tv_sec + ts.tv_nsec / 1e9;
 }
 
-// v == 1.0 would land one past the last bin, so clamp it
+// clamp v == 1.0 into the last bin
 int bin_of(float v)
 {
     int b = (int)(v * (float)num_bins);
@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
 
 void *thread_func(void *arg)
 {
-    (void)arg; // not used, the id comes from next_id
+    (void)arg; // not used since the id comes from next_id
 
     pthread_mutex_lock(&id_lock);
     int my_id = next_id;
@@ -122,9 +122,7 @@ void *thread_func(void *arg)
     long start = my_id * base + (my_id < rem ? my_id : rem);
     long end = start + base + (my_id < rem ? 1 : 0);
 
-    // count on this thread's own stack, then copy the result out once.
-    // counting straight into local_hist was slower: the threads' arrays sit
-    // next to each other in memory and ended up sharing cache lines
+    // count in a local array first so threads do not share cache lines
     long counts[num_bins];
     for (int b = 0; b < num_bins; b++)
         counts[b] = 0;

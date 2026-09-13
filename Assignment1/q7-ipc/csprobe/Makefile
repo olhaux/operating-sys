@@ -3,7 +3,7 @@ obj-m += csprobe.o
 
 KDIR ?= /lib/modules/$(shell uname -r)/build
 
-# CURDIR, not PWD: PWD is wrong when this runs through make -C
+# use CURDIR since PWD is wrong under make -C
 
 all:
 	$(MAKE) -C $(KDIR) M=$(CURDIR) modules
