@@ -3,22 +3,29 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <semaphore.h>
 
 #define NUM_THREADS 8
 #define QUANTUM     1
 
 typedef struct {
-    int id, priority, burst_time, remaining;
-    int completion_time, waiting_time, turnaround_time;
+    int id;
+    int priority;      // lower is more important
+    int burst_time;    // CPU burst time
+    int remaining;     // remaining time
+    int completion_time;
+    int waiting_time;
+    int turnaround_time;
 } thread_info_t;
 
 thread_info_t threads[NUM_THREADS];
 
+// Global scheduler lock: only one thread "on CPU" at a time
 pthread_mutex_t sched_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t  sched_cond = PTHREAD_COND_INITIALIZER;
-int current_running_tid = -1;
-int sim_clock = 0;
-int last_run  = -1;
+int current_running_tid = -1;   // the id of thread allowed to run
+int sim_clock = 0;              // simulated time
+int last_run  = -1;             // the thread that ran last
 
 // start after whoever ran last
 int pick_next() {
@@ -57,24 +64,24 @@ void *thread_func(void *arg) {
         printf("Thread %d (prio %d) runs for %d units\n",
                t->id, t->priority, slice);
 
-        sim_clock   += slice;
+        sim_clock += slice;
         t->remaining -= slice;
-
         if (t->remaining == 0) {
             t->completion_time = sim_clock;
-            t->turnaround_time = t->completion_time;
+            t->turnaround_time = t->completion_time; // everyone arrives at 0
             t->waiting_time    = t->turnaround_time - t->burst_time;
         }
 
         pthread_mutex_unlock(&sched_lock);
-        schedule();
+
+        schedule();  // pick the next thread
     }
     return NULL;
 }
 
 int main() {
     pthread_t tids[NUM_THREADS];
-    int prios[]  = {3, 3, 2, 2, 2, 6, 7, 1};
+    int prios[]  = {3, 3, 2, 2, 2, 6, 7, 1}; // lower has higher priority
     int bursts[] = {7, 6, 2, 8, 7, 1, 1, 9};
 
     for (int i = 0; i < NUM_THREADS; i++) {
@@ -85,11 +92,12 @@ int main() {
     }
 
     sleep(1);
-    schedule();
+    schedule();     // kick off scheduling
 
     for (int i = 0; i < NUM_THREADS; i++)
         pthread_join(tids[i], NULL);
 
+    // waiting and turnaround time per thread
     printf("\n");
     double total_wait = 0.0, total_tat = 0.0;
     for (int i = 0; i < NUM_THREADS; i++) {
@@ -98,6 +106,8 @@ int main() {
         total_wait += threads[i].waiting_time;
         total_tat  += threads[i].turnaround_time;
     }
+
+    // averages
     printf("\nAverage waiting time = %.3f\n", total_wait / NUM_THREADS);
     printf("Average turnaround time = %.3f\n", total_tat / NUM_THREADS);
 
