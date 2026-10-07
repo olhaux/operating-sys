@@ -1,5 +1,4 @@
-/* Q6: allocate N pages of the system page size with malloc().
- * Build with -DINIT to also initialise (touch) the memory (Q6.3). */
+// allocates N pages with malloc(), build with -DINIT to also write to them
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,7 +11,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     long n = atol(argv[1]);
-    int page_size = getpagesize();          /* Q6.1: system-specific page size */
+    int page_size = getpagesize(); // system page size
     size_t bytes = (size_t)n * page_size;
 
     printf("Page size: %d bytes, allocating %ld pages = %zu bytes\n",
@@ -25,7 +24,7 @@ int main(int argc, char *argv[])
     }
 
 #ifdef INIT
-    memset(buf, 1, bytes);                  /* Q6.3: initialise every byte */
+    memset(buf, 1, bytes); // touch every page
     printf("Memory initialised\n");
 #endif
 

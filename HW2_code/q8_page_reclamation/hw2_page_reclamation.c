@@ -1,18 +1,12 @@
-/* Q8: mimic the Linux active/inactive page lists with two threads.
- *   player  : walks the reference string, marks pages referenced and
- *             moves them to the tail of the active list.
- *   checker : wakes every M us, clears reference bits in the active list
- *             and counts how many times it saw each page referenced.
- * usage: ./hw2_page_reclamation N M
- */
+// usage: ./hw2_page_reclamation N M
 #include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <time.h>
 
-#define REF_LEN 10000                /* length of the reference string   */
-#define WATERMARK_PCT 70             /* active list limit, % of N        */
+#define REF_LEN 10000
+#define WATERMARK_PCT 70 // active list limit, in % of N
 
 enum { NO_LIST = 0, ACTIVE = 1, INACTIVE = 2 };
 
@@ -20,39 +14,40 @@ typedef struct page {
      int page_id;
      int reference_bit;
      struct page *next;
-     /* auxiliary */
-     struct page *prev;              /* doubly linked => O(1) unlink     */
-     int list;                       /* which list the page is in        */
-     long total_referenced;          /* counted by checker               */
-     long true_accesses;             /* counted by player (ground truth) */
+     // other auxiliary
+     struct page *prev; // so a page can be unlinked from the middle of a list
+     int list; // which list the page is in
+     long total_referenced; // counted by the checker
+     long true_accesses; // counted by the player, to check the checker
 } Node;
 
 typedef struct {
-     Node *head;                     /* front = least recently used      */
-     Node *tail;                     /* rear  = most recently used       */
+     Node *head; // front, least recently used
+     Node *tail; // rear, most recently used
      int size;
 } List;
 
-static List active_list   = { NULL, NULL, 0 };   /* active list   */
-static List inactive_list = { NULL, NULL, 0 };   /* inactive list */
+// create an active list
+static List active_list = { NULL, NULL, 0 };
 
-static Node *pages;                  /* pages[0..N-1]                    */
-static int  *ref_string;             /* random reference string          */
-static int   N, M, watermark;
-static int   player_done = 0;
+// create an inactive list
+static List inactive_list = { NULL, NULL, 0 };
+
+static Node *pages; // pages[i] is page i
+static int *ref_string;
+static int N, M, watermark;
+static int player_done = 0;
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
-/* ---------- list helpers (caller holds the lock) ---------- */
-static void list_remove(List *l, Node *p)
-{
+// list helpers, only called with the lock held
+static void list_remove(List *l, Node *p) {
      if (p->prev) p->prev->next = p->next; else l->head = p->next;
      if (p->next) p->next->prev = p->prev; else l->tail = p->prev;
      p->next = p->prev = NULL;
      l->size--;
 }
 
-static void list_append(List *l, Node *p)
-{
+static void list_append(List *l, Node *p) {
      p->next = NULL;
      p->prev = l->tail;
      if (l->tail) l->tail->next = p; else l->head = p;
@@ -60,16 +55,13 @@ static void list_append(List *l, Node *p)
      l->size++;
 }
 
-static void list_print(const List *l)
-{
+static void list_print(const List *l) {
      for (Node *p = l->head; p; p = p->next)
           printf("%d%s", p->page_id, p->next ? ", " : "");
      printf("\n");
 }
 
-/* ---------- threads ---------- */
-void *player_thread_func(void *arg)
-{
+void *player_thread_func(void *arg) {
      (void)arg;
      for (int i = 0; i < REF_LEN; i++) {
           pthread_mutex_lock(&lock);
@@ -77,13 +69,13 @@ void *player_thread_func(void *arg)
           p->reference_bit = 1;
           p->true_accesses++;
 
-          /* move the page to the rear of the active list */
+          // move the page to the rear of the active list
           if (p->list == ACTIVE)   list_remove(&active_list, p);
           if (p->list == INACTIVE) list_remove(&inactive_list, p);
           list_append(&active_list, p);
           p->list = ACTIVE;
 
-          /* above the watermark: demote pages from the front */
+          // over the watermark, move pages from the front to the inactive list
           while (active_list.size > watermark) {
                Node *victim = active_list.head;
                list_remove(&active_list, victim);
@@ -100,14 +92,13 @@ void *player_thread_func(void *arg)
      pthread_exit(0);
 }
 
-void *checker_thread_func(void *arg)
-{
+void *checker_thread_func(void *arg) {
      (void)arg;
      int done = 0;
      while (!done) {
           usleep(M);
           pthread_mutex_lock(&lock);
-          done = player_done;        /* one last scan after player ends */
+          done = player_done; // one last pass after the player is done
           for (Node *p = active_list.head; p; p = p->next) {
                if (p->reference_bit) {
                     p->total_referenced++;
@@ -139,32 +130,38 @@ int main(int argc, char *argv[])
      if (!pages || !ref_string) { perror("alloc"); return 1; }
      for (int i = 0; i < N; i++) pages[i].page_id = i;
 
-     /* random reference string of REF_LEN accesses to pages 0..N-1 */
-     srand(time(NULL));
+     // create a random reference string
+     srand(time(NULL) ^ getpid()); // differs even for two runs in the same second
      for (int i = 0; i < REF_LEN; i++) ref_string[i] = rand() % N;
 
      /* Create two workers */
      pthread_t player;
      pthread_t checker;
+
      pthread_create(&player, NULL, player_thread_func, NULL);
      pthread_create(&checker, NULL, checker_thread_func, NULL);
+
      pthread_join(player, NULL);
      pthread_join(checker, NULL);
 
      long sum_checker = 0, sum_true = 0;
      printf("Page_Id, Total_Referenced\n");
+     //Print out the statistics of page references
      for (int i = 0; i < N; i++) {
           printf("%d, %ld\n", i, pages[i].total_referenced);
           sum_checker += pages[i].total_referenced;
-          sum_true    += pages[i].true_accesses;
+          sum_true += pages[i].true_accesses;
      }
 
      printf("Pages in active list: ");
+     //Print out the list of pages in active list
      list_print(&active_list);
+
      printf("Pages in inactive list: ");
+     //Print out the list of pages in inactive list
      list_print(&inactive_list);
 
-     /* sanity checks (useful for Q8.1) */
+     // checks we use in 8.1
      printf("\n[check] N=%d M=%d watermark=%d\n", N, M, watermark);
      printf("[check] active=%d inactive=%d (sum %d)\n",
             active_list.size, inactive_list.size,
@@ -172,7 +169,7 @@ int main(int argc, char *argv[])
      printf("[check] accesses seen by checker = %ld, real accesses = %ld (%.1f%%)\n",
             sum_checker, sum_true, 100.0 * sum_checker / sum_true);
 
-     /* free up resources properly */
+     /*free up resources properly */
      free(pages);
      free(ref_string);
      pthread_mutex_destroy(&lock);
