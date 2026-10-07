@@ -110,9 +110,18 @@ void *checker_thread_func(void *arg) {
 
 int main(int argc, char *argv[])
 {
+     if (argc < 3) {
+          printf("usage: ./hw2_page_reclamation N M\n");
+          return 1;
+     }
      N = atoi(argv[1]);
      M = atoi(argv[2]);
+     if (N <= 0 || M < 0) {
+          printf("N has to be > 0 and M >= 0\n");
+          return 1;
+     }
      watermark = N * WATERMARK_PCT / 100;
+     if (watermark < 1) watermark = 1;
 
      pages = calloc(N, sizeof(Node));
      ref_string = malloc(REF_LEN * sizeof(int));
