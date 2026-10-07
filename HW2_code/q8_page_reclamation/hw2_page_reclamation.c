@@ -8,17 +8,17 @@
 #define REF_LEN 10000
 #define WATERMARK_PCT 70 // active list limit, in % of N
 
-enum { NO_LIST = 0, ACTIVE = 1, INACTIVE = 2 };
+enum { ACTIVE = 1, INACTIVE = 2 };
 
 typedef struct page {
      int page_id;
      int reference_bit;
      struct page *next;
      // other auxiliary
-     struct page *prev; // so a page can be unlinked from the middle of a list
-     int list; // which list the page is in
-     long total_referenced; // counted by the checker
-     long true_accesses; // counted by the player, to check the checker
+     struct page *prev;
+     int list; // ACTIVE, INACTIVE or 0 before the first reference
+     long total_referenced;
+     long true_accesses; // real number of accesses
 } Node;
 
 typedef struct {
@@ -62,7 +62,6 @@ static void list_print(const List *l) {
 }
 
 void *player_thread_func(void *arg) {
-     (void)arg;
      for (int i = 0; i < REF_LEN; i++) {
           pthread_mutex_lock(&lock);
           Node *p = &pages[ref_string[i]];
@@ -93,7 +92,6 @@ void *player_thread_func(void *arg) {
 }
 
 void *checker_thread_func(void *arg) {
-     (void)arg;
      int done = 0;
      while (!done) {
           usleep(M);
@@ -112,18 +110,9 @@ void *checker_thread_func(void *arg) {
 
 int main(int argc, char *argv[])
 {
-     if (argc < 3) {
-          fprintf(stderr, "usage: %s N M\n", argv[0]);
-          return 1;
-     }
      N = atoi(argv[1]);
      M = atoi(argv[2]);
-     if (N <= 0 || M < 0) {
-          fprintf(stderr, "N must be > 0 and M >= 0\n");
-          return 1;
-     }
      watermark = N * WATERMARK_PCT / 100;
-     if (watermark < 1) watermark = 1;
 
      pages = calloc(N, sizeof(Node));
      ref_string = malloc(REF_LEN * sizeof(int));
@@ -131,7 +120,7 @@ int main(int argc, char *argv[])
      for (int i = 0; i < N; i++) pages[i].page_id = i;
 
      // create a random reference string
-     srand(time(NULL) ^ getpid()); // differs even for two runs in the same second
+     srand(time(NULL) ^ getpid());
      for (int i = 0; i < REF_LEN; i++) ref_string[i] = rand() % N;
 
      /* Create two workers */

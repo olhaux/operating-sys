@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/mman.h>
 #include <time.h>
 #if defined(__x86_64__) || defined(__i386__)
@@ -27,10 +28,6 @@ int main(int argc, char** argv){
 
   unsigned long long start,end;
 
-  if (argc < 2) {
-    fprintf(stderr, "usage: %s N [huge]\n", argv[0]);
-    return 1;
-  }
   int num_pages = atoi(argv[1]);
   int use_huge = (argc > 2 && strcmp(argv[2], "huge") == 0);
   int page_size = getpagesize();
@@ -51,8 +48,9 @@ int main(int argc, char** argv){
   addr = (char*) mmap(NULL, length, PROT_READ | PROT_WRITE, flags, -1, 0);
 
   if (addr == MAP_FAILED) {
+    int err = errno;
     perror("mmap");
-    if (use_huge)
+    if (use_huge && err == ENOMEM)
       fprintf(stderr, "reserve huge pages first: sudo sysctl -w vm.nr_hugepages=40\n");
     exit(1);
   }
